@@ -3,7 +3,7 @@ window.PanaCharts=(()=>{
  const ink='#20324b',blue='#4574c6',gold='#986e1b';
  const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const median=a=>{const s=[...a].sort((a,b)=>a-b);return s.length%2?s[s.length>>1]:(s[s.length/2-1]+s[s.length/2])/2};
- let fixedAxis=null;
+ let fixedAxis=null, current=null;
  const fmt=new Intl.DateTimeFormat('es-PA',{timeZone:'America/Panama',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
  function medianFit(events){
   if(events.length<2)return null;
@@ -31,12 +31,12 @@ window.PanaCharts=(()=>{
   let ee=0,nn=0,en=0;for(const p of points){const e=p.east-me,n=p.north-mn;ee+=e*e;nn+=n*n;en+=e*n}
   const angle=.5*Math.atan2(2*en,ee-nn);let east=Math.cos(angle),north=Math.sin(angle);
   if(east<0||(Math.abs(east)<1e-10&&north<0)){east=-east;north=-north}
-  return{east,north,bearing:(Math.atan2(east,north)*180/Math.PI+360)%360,n:points.length};
+  return{east,north,bearing:(Math.atan2(east,north)*180/Math.PI+360)%360,n:points.length,share:(ee+nn+Math.hypot(ee-nn,2*en))/(2*(ee+nn))};
  }
  const direction=b=>['N','NE','E','SE','S','SO','O','NO'][Math.round(b/45)%8];
  function render(visible,catalog){
   const events=[...visible].sort((a,b)=>a.time-b.time),note=document.getElementById('chartNote');
-  if(!events.length){for(const id of ['magnitudeChart','distanceChart'])document.getElementById(id).innerHTML='<p class="chart-empty">No hay sismos con estos filtros.</p>';note.textContent='Los gráficos siguen los filtros del mapa.';return}
+  if(!events.length){current=null; updateInterpretation();for(const id of ['magnitudeChart','distanceChart'])document.getElementById(id).innerHTML='<p class="chart-empty">No hay sismos con estos filtros.</p>';note.textContent='Los gráficos siguen los filtros del mapa.';return}
   const reference=catalog.find(e=>e.id==='us6000u18k')||{lat:7.5868,lon:-80.769,time:Date.parse('2026-10-09T17:56:06.036Z')};
   const axis=fixedAxis||(fixedAxis=principalAxis(catalog,reference));
   window.drawSeismicAxis?.(axis,reference);
@@ -64,7 +64,36 @@ window.PanaCharts=(()=>{
   if(peaks.length>=2){const a=peaks.at(-2),b=peaks.at(-1);if(b.time>a.time&&last>b.time){let stop=last,value=b.mag+(b.mag-a.mag)*(last-b.time)/(b.time-a.time);if(value<low){stop=b.time+(low-b.mag)*(b.time-a.time)/(b.mag-a.mag);value=low}extension=[{time:b.time,value:b.mag},{time:stop,value}]}}
   plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(extension.length?line(extension,y,gold,true):'')+(fit?line(fit,y,ink):''));
   const positions=events.map(e=>{const p=offset(e,reference);return{e,value:p.east*axis.east+p.north*axis.north}}),extent=Math.max(20,Math.ceil(Math.max(...positions.map(p=>Math.abs(p.value)))/20)*20);plot('distanceChart',positions,'Posición sobre el eje (km)',-extent,extent);
+  current={events,axis,reference,positions,fit}; updateInterpretation();
   note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
+ function interpret(){
+  if(!current)return '<p>No hay eventos con los filtros actuales.</p>';
+  const {events,axis,reference,positions,fit}=current;
+  const fmtN=n=>n.toLocaleString('es-PA',{maximumFractionDigits:1});
+  const out=[];
+  out.push('<p><strong>Lectura de '+events.length+' eventos visibles</strong> · '+escape(fmt.format(events[0].time))+' a '+escape(fmt.format(events.at(-1).time))+'.</p>');
+  out.push('<p><strong>Eje espacial.</strong> Azimut '+axis.bearing.toFixed(0)+'°; positivo hacia '+direction(axis.bearing)+'. '+(Number.isFinite(axis.share)?'El eje concentra el '+fmtN(axis.share*100)+' % de la variación espacial de los '+axis.n+' eventos usados al abrir la página.':'Hay pocos eventos para evaluar una orientación preferente.')+' Es una orientación estadística de los epicentros, no una falla identificada.</p>');
+  const sequence=events.filter(e=>e.time>reference.time&&distance(e,reference)<=150);
+  if(sequence.length<10||sequence.at(-1).time===sequence[0].time){out.push('<p>Se necesitan al menos 10 eventos posteriores al principal, dentro de 150 km, para comparar magnitud, frecuencia y alcance. Con estos filtros hay '+sequence.length+'.</p>');}
+  else{
+   const midpoint=(sequence[0].time+sequence.at(-1).time)/2,a=sequence.filter(e=>e.time<midpoint),b=sequence.filter(e=>e.time>=midpoint);
+   out.push('<p>Comparación de dos mitades de igual duración, desde el primer evento posterior visible hasta el último, excluyendo el principal y eventos a más de 150 km: '+a.length+' frente a '+b.length+' eventos. Corte: '+escape(fmt.format(midpoint))+'.</p>');
+   if(a.length>=5&&b.length>=5){
+    const max=x=>Math.max(...x.map(e=>e.mag)),ma=max(a),mb=max(b),da=median(a.map(e=>e.mag)),db=median(b.map(e=>e.mag));
+    out.push('<p><strong>Magnitudes.</strong> El máximo observado '+(mb<ma?'baja':mb>ma?'sube':'se mantiene')+' de M '+fmtN(ma)+' a M '+fmtN(mb)+'. La mediana pasa de M '+fmtN(da)+' a M '+fmtN(db)+'. MaxTrend selecciona picos descendentes por construcción; su forma sola no demuestra una disminución sostenida.</p>');
+    const gaps=x=>x.slice(1).map((e,i)=>(e.time-x[i].time)/60000),ga=median(gaps(a)),gb=median(gaps(b));
+    out.push('<p><strong>Intervalos.</strong> La mediana entre eventos consecutivos pasa de '+fmtN(ga)+' a '+fmtN(gb)+' minutos. '+(gb>ga?'Los eventos visibles están más espaciados en la segunda mitad.':gb<ga?'Los eventos visibles están más próximos en la segunda mitad.':'El intervalo mediano se mantiene.')+' Se compara el mismo umbral de magnitud; no incluye eventos no registrados.</p>');
+    const projected=e=>positions.find(p=>p.e===e).value;
+    const edge=(x,sign)=>Math.max(0,...x.map(e=>sign*projected(e)));
+    const negA=edge(a,-1),negB=edge(b,-1),posA=edge(a,1),posB=edge(b,1),change=Math.max(negB-negA,posB-posA);
+    out.push('<p><strong>Alcance sobre el eje.</strong> Lado negativo: −'+fmtN(negA)+' → −'+fmtN(negB)+' km; lado positivo: +'+fmtN(posA)+' → +'+fmtN(posB)+' km. '+(change>5?'Al menos un extremo observado se aleja más de 5 km en la segunda mitad.':'Ningún extremo observado se aleja más de 5 km en esta comparación.')+' Se usan extremos de cada mitad, sensibles a eventos aislados; 5 km es un criterio descriptivo, no un umbral físico ni una prueba estadística. Esto no mide apertura de falla.</p>');
+   }else out.push('<p>Una mitad contiene menos de 5 eventos; la comparación temporal es insuficiente.</p>');
+  }
+  out.push('<p class="interpret-limit">Lectura descriptiva de los datos filtrados. La cercanía no demuestra que todos sean réplicas. Los filtros, la detección y la incertidumbre de localización afectan la lectura; estas cifras no permiten afirmar que la secuencia terminó ni predecir el siguiente sismo.</p>');
+  return out.join('');
+ }
+ function updateInterpretation(){const panel=document.getElementById('interpretation');if(panel&&!panel.hidden)panel.innerHTML=interpret();}
+ document.getElementById('interpret').addEventListener('click',()=>{const panel=document.getElementById('interpretation');panel.hidden=!panel.hidden;document.getElementById('interpret').setAttribute('aria-expanded',String(!panel.hidden));updateInterpretation();});
  return{render};
 })();
