@@ -56,13 +56,14 @@ window.PanaCharts=(()=>{
   const candidates=[];let max=-Infinity;for(let i=events.length-1;i>=0;i--)if(events[i].mag>max){candidates.push(i);max=events[i].mag}candidates.reverse();
   const prominence=i=>{let left=events[i].mag,right=events[i].mag;for(let j=i-1;j>=0;j--){if(events[j].mag>events[i].mag)break;left=Math.min(left,events[j].mag)}for(let j=i+1;j<events.length;j++){if(events[j].mag>events[i].mag)break;right=Math.min(right,events[j].mag)}return events[i].mag-Math.max(left,right)};
   const peaks=candidates.filter((i,k)=>k===0||(i>0&&i<events.length-1&&events[i].mag>=events[i-1].mag&&events[i].mag>=events[i+1].mag&&prominence(i)>=1)).map(i=>events[i]);
+  const selected=events.find(e=>e.id==='us6000u1e5');if(selected&&!peaks.some(e=>e.id===selected.id)){peaks.push(selected);peaks.sort((a,b)=>a.time-b.time)}
   const fit=medianFit(events),mags=events.map(e=>e.mag),low=Math.floor(Math.min(...mags)*2)/2-.2,high=Math.ceil(Math.max(...mags)*2)/2+.3;
   const line=(pts,y,color,dashed=false)=>'<polyline points="'+pts.map(p=>x(p.time)+','+y(p.value)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="2.4"'+(dashed?' stroke-dasharray="6 5"':'')+'/>';
   let extension=[];
   if(peaks.length>=2){const a=peaks.at(-2),b=peaks.at(-1);if(b.time>a.time&&last>b.time){let stop=last,value=b.mag+(b.mag-a.mag)*(last-b.time)/(b.time-a.time);if(value<low){stop=b.time+(low-b.mag)*(b.time-a.time)/(b.mag-a.mag);value=low}extension=[{time:b.time,value:b.mag},{time:stop,value}]}}
   plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(extension.length?line(extension,y,gold,true):'')+(fit?line(fit,y,ink):''));
   const positions=events.map(e=>{const p=offset(e,reference);return{e,value:p.east*axis.east+p.north*axis.north}}),extent=Math.max(20,Math.ceil(Math.max(...positions.map(p=>Math.abs(p.value)))/20)*20);plot('distanceChart',positions,'Posición sobre el eje (km)',-extent,extent);
-  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une máximos dominantes con prominencia ≥ 1 M y descenso posterior observado; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
+  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
  return{render};
 })();
