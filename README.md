@@ -1,0 +1,2 @@
+# panasismos
+visualizador de sismos
