@@ -7,8 +7,6 @@ window.PanaCharts=(()=>{
  const fmt=new Intl.DateTimeFormat('es-PA',{timeZone:'America/Panama',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
  function medianFit(events){
   if(events.length<2)return null;
-  const axis=fixedAxis||(fixedAxis=principalAxis(catalog,reference));
-  document.getElementById('distanceAxisNote').textContent='0 = epicentro del sismo principal. + hacia '+direction(axis.bearing)+'; − hacia '+direction((axis.bearing+180)%360)+'. Eje estimado al abrir con '+axis.n+' eventos M ≥ 4 dentro de 150 km desde el 9 oct.; azimut '+axis.bearing.toFixed(0)+'°. Se mantiene fijo al filtrar. La proyección no mide apertura de falla.';
   const first=events[0].time,span=events.at(-1).time-first;if(!span)return null;
   const xs=events.map(e=>(e.time-first)/span),ys=events.map(e=>e.mag);
   const at=b=>{const a=median(ys.map((y,i)=>y-b*xs[i]));return{a,b,cost:ys.reduce((s,y,i)=>s+Math.abs(y-a-b*xs[i]),0)}};
@@ -40,6 +38,8 @@ window.PanaCharts=(()=>{
   const events=[...visible].sort((a,b)=>a.time-b.time),note=document.getElementById('chartNote');
   if(!events.length){for(const id of ['magnitudeChart','distanceChart'])document.getElementById(id).innerHTML='<p class="chart-empty">No hay sismos con estos filtros.</p>';note.textContent='Los gráficos siguen los filtros del mapa.';return}
   const reference=catalog.find(e=>e.id==='us6000u18k')||{lat:7.5868,lon:-80.769,time:Date.parse('2026-10-09T17:56:06.036Z')};
+  const axis=fixedAxis||(fixedAxis=principalAxis(catalog,reference));
+  document.getElementById('distanceAxisNote').textContent='0 = epicentro del sismo principal. + hacia '+direction(axis.bearing)+'; − hacia '+direction((axis.bearing+180)%360)+'. Eje estimado al abrir con '+axis.n+' eventos M ≥ 4 dentro de 150 km desde el 9 oct.; azimut '+axis.bearing.toFixed(0)+'°. Se mantiene fijo al filtrar. La proyección no mide apertura de falla.';
   const first=events[0].time,last=events.at(-1).time,start=first-3600000,end=Math.max(last,first+3600000),W=960,H=310,L=65,R=22,T=20,B=62;
   const x=t=>L+(t-start)/(end-start)*(W-L-R);
   function plot(id,values,label,ymin,ymax,extra){
