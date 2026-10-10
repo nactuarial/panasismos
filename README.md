@@ -17,8 +17,8 @@ Desde la raíz ejecutar `python3 -m http.server 8000` y abrir http://localhost:8
 ## Interpretación
 Los puntos representan epicentros estimados, no fallas. Este visualizador no calcula probabilidades ni predice terremotos. El tamaño de los círculos es visual y no representa energía ni área de ruptura. El umbral de completitud requiere evaluación independiente. Los catálogos se revisan y pueden omitir eventos pequeños, especialmente tras un terremoto grande.
 
-Las consultas de rango sustituyen el catálogo en memoria. Los filtros actúan sobre el catálogo cargado; los botones de períodos también consultan USGS. La copia inicial permite usar el mapa sin una consulta en vivo. El mapa base requiere acceso a CARTO/OpenStreetMap; los datos requieren acceso a earthquake.usgs.gov.
+Las consultas de rango sustituyen el catálogo en memoria. Los filtros actúan sobre el catálogo cargado; los botones de períodos también consultan USGS. La copia inicial permite usar el mapa sin una consulta en vivo. El mapa base requiere acceso a OpenStreetMap; los datos requieren acceso a earthquake.usgs.gov.
 
 ## Créditos
 Datos: USGS https://earthquake.usgs.gov/fdsnws/event/1/ (la descarga no implica respaldo de USGS).
-Mapa: OpenStreetMap y CARTO. Leaflet 1.9.4, licencia BSD-2-Clause.
+Mapa: OpenStreetMap. Leaflet 1.9.4, licencia BSD-2-Clause.
