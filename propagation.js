@@ -12,7 +12,7 @@
  const pWave=L.circle([ref.lat,ref.lon],{radius:0,color:'#147dba',weight:2.5,fill:false,interactive:false}).addTo(waves);
  const sWave=L.circle([ref.lat,ref.lon],{radius:0,color:'#986e1b',weight:3,dashArray:'6 4',fill:false,interactive:false}).addTo(waves);
  L.circleMarker([ref.lat,ref.lon],{radius:7,color:'#ffffff',weight:2,fillColor:'#b13b32',fillOpacity:1}).addTo(smap).bindTooltip('Epicentro · M 7,7',{permanent:true,direction:'top'});
- const capital=L.circleMarker([locations.panama.lat,locations.panama.lon],{radius:6,color:'#20324b',weight:2,fillColor:'#ffffff',fillOpacity:1}).addTo(smap).bindTooltip('Ciudad de Panamá',{permanent:true,direction:'right'});
+ const capital=L.marker([locations.panama.lat,locations.panama.lon],{title:'Ciudad de Panamá',icon:L.divIcon({className:'capital-star',html:'<span aria-hidden="true">★</span>',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(smap).bindTooltip('Ciudad de Panamá',{direction:'top'});
  const selected=L.circleMarker([locations.panama.lat,locations.panama.lon],{radius:9,color:'#20324b',weight:2,fill:false}).addTo(smap);
  let grid=null,point=locations.panama,time=0,running=false,frame=0,previous=0;
  const format=new Intl.DateTimeFormat('es-PA',{timeZone:'America/Panama',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
