@@ -39,6 +39,7 @@ window.PanaCharts=(()=>{
   if(!events.length){for(const id of ['magnitudeChart','distanceChart'])document.getElementById(id).innerHTML='<p class="chart-empty">No hay sismos con estos filtros.</p>';note.textContent='Los gráficos siguen los filtros del mapa.';return}
   const reference=catalog.find(e=>e.id==='us6000u18k')||{lat:7.5868,lon:-80.769,time:Date.parse('2026-10-09T17:56:06.036Z')};
   const axis=fixedAxis||(fixedAxis=principalAxis(catalog,reference));
+  window.drawSeismicAxis?.(axis,reference);
   document.getElementById('distanceAxisNote').textContent='0 = epicentro del sismo principal. + hacia '+direction(axis.bearing)+'; − hacia '+direction((axis.bearing+180)%360)+'. Eje estimado al abrir con '+axis.n+' eventos M ≥ 4 dentro de 150 km desde el 9 oct.; azimut '+axis.bearing.toFixed(0)+'°. Se mantiene fijo al filtrar. La proyección no mide apertura de falla.';
   const first=events[0].time,last=events.at(-1).time,start=first-3600000,end=Math.max(last,first+3600000),W=960,H=310,L=65,R=22,T=20,B=62;
   const x=t=>L+(t-start)/(end-start)*(W-L-R);
