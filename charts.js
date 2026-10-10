@@ -20,7 +20,7 @@ window.PanaCharts=(()=>{
  function render(visible,catalog){
   const events=[...visible].sort((a,b)=>a.time-b.time),note=document.getElementById('chartNote');
   if(!events.length){for(const id of ['magnitudeChart','distanceChart'])document.getElementById(id).innerHTML='<p class="chart-empty">No hay sismos con estos filtros.</p>';note.textContent='Los gráficos siguen los filtros del mapa.';return}
-  const reference=catalog.find(e=>e.id==='us6000u18k')||{lat:7.5868,lon:-80.769};
+  const reference=catalog.find(e=>e.id==='us6000u18k')||{lat:7.5868,lon:-80.769,time:Date.parse('2026-10-09T17:56:06.036Z')};
   const first=events[0].time,last=events.at(-1).time,start=first-3600000,end=Math.max(last,first+3600000),W=960,H=310,L=65,R=22,T=20,B=62;
   const x=t=>L+(t-start)/(end-start)*(W-L-R);
   function plot(id,values,label,ymin,ymax,extra){
@@ -33,12 +33,14 @@ window.PanaCharts=(()=>{
    values.forEach(({e,value})=>{const tooltip='M '+e.mag.toFixed(1)+' · '+fmt.format(e.time)+' · '+e.place+(id==='distanceChart'?' · '+value.toFixed(1)+' km':'');parts.push('<circle cx="'+x(e.time)+'" cy="'+y(value)+'" r="'+(id==='distanceChart'?Math.max(3,3+(e.mag-4)*1.5):3.5)+'" fill="'+blue+'" fill-opacity=".8" stroke="white" stroke-width=".6"><title>'+escape(tooltip)+'</title></circle>')});
    if(extra)parts.push(extra(y));parts.push('</svg>');document.getElementById(id).innerHTML=parts.join('');
   }
-  const peaks=[];let max=-Infinity;for(let i=events.length-1;i>=0;i--)if(events[i].mag>max){peaks.push(events[i]);max=events[i].mag}peaks.reverse();
+  const candidates=[];let max=-Infinity;for(let i=events.length-1;i>=0;i--)if(events[i].mag>max){candidates.push(i);max=events[i].mag}candidates.reverse();
+  const prominence=i=>{let left=events[i].mag,right=events[i].mag;for(let j=i-1;j>=0;j--){if(events[j].mag>events[i].mag)break;left=Math.min(left,events[j].mag)}for(let j=i+1;j<events.length;j++){if(events[j].mag>events[i].mag)break;right=Math.min(right,events[j].mag)}return events[i].mag-Math.max(left,right)};
+  const peaks=candidates.filter((i,k)=>k===0||(i>0&&i<events.length-1&&events[i].mag>=events[i-1].mag&&events[i].mag>=events[i+1].mag&&prominence(i)>=1)).map(i=>events[i]);
   const fit=medianFit(events),mags=events.map(e=>e.mag),low=Math.floor(Math.min(...mags)*2)/2-.2,high=Math.ceil(Math.max(...mags)*2)/2+.3;
   const line=(pts,y,color)=>'<polyline points="'+pts.map(p=>x(p.time)+','+y(p.value)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="2.4"/>';
   plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(fit?line(fit,y,ink):''));
   const distances=events.map(e=>({e,value:distance(e,reference)}));plot('distanceChart',distances,'Distancia epicentral (km)',0,Math.max(20,Math.ceil(Math.max(...distances.map(p=>p.value))/20)*20));
-  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une máximos superiores a todos los eventos posteriores; es descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
+  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une máximos dominantes con prominencia ≥ 1 M y descenso posterior observado; termina en el último pico confirmado, sin unirlo al último sismo. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
  return{render};
 })();
