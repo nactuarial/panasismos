@@ -64,16 +64,22 @@ window.PanaCharts=(()=>{
   if(peaks.length>=2){const a=peaks.at(-2),b=peaks.at(-1);if(b.time>a.time&&last>b.time){let stop=last,value=b.mag+(b.mag-a.mag)*(last-b.time)/(b.time-a.time);if(value<low){stop=b.time+(low-b.mag)*(b.time-a.time)/(b.mag-a.mag);value=low}extension=[{time:b.time,value:b.mag},{time:stop,value}]}}
   plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(extension.length?line(extension,y,gold,true):'')+(fit?line(fit,y,ink):''));
   const positions=events.map(e=>{const p=offset(e,reference);return{e,value:p.east*axis.east+p.north*axis.north}}),extent=Math.max(20,Math.ceil(Math.max(...positions.map(p=>Math.abs(p.value)))/20)*20);plot('distanceChart',positions,'Posición sobre el eje (km)',-extent,extent);
-  current={events,axis,reference,positions,fit}; updateInterpretation();
+  current={events,axis,reference,positions,fit,peaks}; updateInterpretation();
   note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
  function interpret(){
   if(!current)return '<p>No hay eventos con los filtros actuales.</p>';
-  const {events,axis,reference,positions,fit}=current;
+  const {events,axis,reference,positions,fit,peaks}=current;
   const fmtN=n=>n.toLocaleString('es-PA',{maximumFractionDigits:1});
   const out=[];
   out.push('<p><strong>Lectura de '+events.length+' eventos visibles</strong> · '+escape(fmt.format(events[0].time))+' a '+escape(fmt.format(events.at(-1).time))+'.</p>');
   out.push('<p><strong>Eje espacial.</strong> Azimut '+axis.bearing.toFixed(0)+'°; positivo hacia '+direction(axis.bearing)+'. '+(Number.isFinite(axis.share)?'El eje concentra el '+fmtN(axis.share*100)+' % de la variación espacial de los '+axis.n+' eventos usados al abrir la página.':'Hay pocos eventos para evaluar una orientación preferente.')+' Es una orientación estadística de los epicentros, no una falla identificada.</p>');
+  const trendDirection=delta=>delta<-.05?'descendente':delta>.05?'ascendente':'prácticamente estable';
+  if(peaks.length>=2&&fit){
+   const maxDirection=trendDirection(peaks.at(-1).mag-peaks[0].mag),medianDirection=trendDirection(fit[1].value-fit[0].value);
+   const bothDown=maxDirection==='descendente'&&medianDirection==='descendente';
+   out.push('<p><strong>Tendencia de magnitud.</strong> '+(bothDown?'MaxTrend y MedianTrend descienden en el período mostrado: tanto los picos seleccionados como la magnitud central ajustada presentan una tendencia a la baja.':'MaxTrend es '+maxDirection+' y MedianTrend es '+medianDirection+' en el período mostrado.')+' MaxTrend pasa de M '+fmtN(peaks[0].mag)+' a M '+fmtN(peaks.at(-1).mag)+'; MedianTrend, de M '+fmtN(fit[0].value)+' a M '+fmtN(fit[1].value)+'. La lectura de MaxTrend utiliza su tramo continuo; la extensión punteada no se considera un dato observado.</p>');
+  }else out.push('<p><strong>Tendencia de magnitud.</strong> Faltan puntos para comparar ambas líneas de tendencia con estos filtros.</p>');
   const sequence=events.filter(e=>e.time>reference.time&&distance(e,reference)<=150);
   if(sequence.length<10||sequence.at(-1).time===sequence[0].time){out.push('<p>Se necesitan al menos 10 eventos posteriores al principal, dentro de 150 km, para comparar magnitud, frecuencia y alcance. Con estos filtros hay '+sequence.length+'.</p>');}
   else{
@@ -81,7 +87,7 @@ window.PanaCharts=(()=>{
    out.push('<p>Comparación de dos mitades de igual duración, desde el primer evento posterior visible hasta el último, excluyendo el principal y eventos a más de 150 km: '+a.length+' frente a '+b.length+' eventos. Corte: '+escape(fmt.format(midpoint))+'.</p>');
    if(a.length>=5&&b.length>=5){
     const max=x=>Math.max(...x.map(e=>e.mag)),ma=max(a),mb=max(b),da=median(a.map(e=>e.mag)),db=median(b.map(e=>e.mag));
-    out.push('<p><strong>Magnitudes.</strong> El máximo observado '+(mb<ma?'baja':mb>ma?'sube':'se mantiene')+' de M '+fmtN(ma)+' a M '+fmtN(mb)+'. La mediana pasa de M '+fmtN(da)+' a M '+fmtN(db)+'. MaxTrend selecciona picos descendentes por construcción; su forma sola no demuestra una disminución sostenida.</p>');
+    out.push('<p><strong>Magnitudes.</strong> El máximo observado '+(mb<ma?'baja':mb>ma?'sube':'se mantiene')+' de M '+fmtN(ma)+' a M '+fmtN(mb)+'. La mediana pasa de M '+fmtN(da)+' a M '+fmtN(db)+'. Esta comparación de todos los eventos complementa la lectura de las dos líneas de tendencia.</p>');
     const gaps=x=>x.slice(1).map((e,i)=>(e.time-x[i].time)/60000),ga=median(gaps(a)),gb=median(gaps(b));
     out.push('<p><strong>Intervalos.</strong> La mediana entre eventos consecutivos pasa de '+fmtN(ga)+' a '+fmtN(gb)+' minutos. '+(gb>ga?'Los eventos visibles están más espaciados en la segunda mitad.':gb<ga?'Los eventos visibles están más próximos en la segunda mitad.':'El intervalo mediano se mantiene.')+' Se compara el mismo umbral de magnitud; no incluye eventos no registrados.</p>');
     const projected=e=>positions.find(p=>p.e===e).value;
