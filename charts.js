@@ -41,7 +41,7 @@ window.PanaCharts=(()=>{
   const axis=fixedAxis||(fixedAxis=principalAxis(catalog,reference));
   window.drawSeismicAxis?.(axis,reference);
   document.getElementById('distanceAxisNote').textContent='0 = epicentro del sismo principal. + hacia '+direction(axis.bearing)+'; − hacia '+direction((axis.bearing+180)%360)+'. Eje estimado al abrir con '+axis.n+' eventos M ≥ 4 dentro de 150 km desde el 9 oct.; azimut '+axis.bearing.toFixed(0)+'°. Se mantiene fijo al filtrar. La proyección no mide apertura de falla.';
-  const first=events[0].time,last=events.at(-1).time,start=first-3600000,end=Math.max(last,first+3600000),W=960,H=310,L=65,R=22,T=20,B=62;
+  const first=events[0].time,last=events.at(-1).time,start=Math.min(first,reference.time)-3600000,end=Math.max(last,reference.time+3600000,first+3600000),W=960,H=310,L=65,R=22,T=20,B=62;
   const x=t=>L+(t-start)/(end-start)*(W-L-R);
   function plot(id,values,label,ymin,ymax,extra){
    const y=v=>H-B-(v-ymin)/(ymax-ymin)*(H-B-T);let parts=[];
@@ -50,7 +50,7 @@ window.PanaCharts=(()=>{
    for(let i=0;i<5;i++){const t=start+(end-start)*i/4,xx=x(t),s=fmt.format(t).split(',');parts.push('<text x="'+xx+'" y="'+(H-B+24)+'" text-anchor="middle">'+escape(s[0])+'<tspan x="'+xx+'" dy="16">'+escape(s[1]||'')+'</tspan></text>')}
    parts.push('<text transform="translate(17 '+((T+H-B)/2)+') rotate(-90)" text-anchor="middle">'+escape(label)+'</text>');
    if(id==='distanceChart')parts.push('<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(0)+'" y2="'+y(0)+'" stroke="#986e1b" stroke-width="1.3"/>');
-   if(reference.time>=start&&reference.time<=end)parts.push('<line x1="'+x(reference.time)+'" x2="'+x(reference.time)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="'+gold+'" stroke-dasharray="5 5"/>');
+   if(reference.time>=start&&reference.time<=end){const referenceX=x(reference.time);parts.push('<line x1="'+referenceX+'" x2="'+referenceX+'" y1="'+T+'" y2="'+(H-B)+'" stroke="'+gold+'" stroke-width="1.5" stroke-dasharray="5 5"><title>Sismo principal · 9 oct. 2026, 12:56 Panamá</title></line>');if(id==='magnitudeChart'){const labelX=Math.min(referenceX+8,W-R-194);parts.push('<rect x="'+labelX+'" y="'+(T+3)+'" width="194" height="25" rx="4" fill="#fbf7ed" stroke="#d4bd87"/><text x="'+(labelX+9)+'" y="'+(T+20)+'" style="fill:'+gold+';font-weight:600">Sismo principal · 12:56</text>');}}
    values.forEach(({e,value})=>{const tooltip='M '+e.mag.toFixed(1)+' · '+fmt.format(e.time)+' · '+e.place+(id==='distanceChart'?' · '+(value>0?'+':'')+value.toFixed(1)+' km sobre el eje':'');parts.push('<circle cx="'+x(e.time)+'" cy="'+y(value)+'" r="'+(id==='distanceChart'?Math.max(3,3+(e.mag-4)*1.5):3.5)+'" fill="'+blue+'" fill-opacity=".8" stroke="white" stroke-width=".6"><title>'+escape(tooltip)+'</title></circle>')});
    if(extra)parts.push(extra(y));parts.push('</svg>');document.getElementById(id).innerHTML=parts.join('');
   }
@@ -65,7 +65,7 @@ window.PanaCharts=(()=>{
   plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(extension.length?line(extension,y,gold,true):'')+(fit?line(fit,y,ink):''));
   const positions=events.map(e=>{const p=offset(e,reference);return{e,value:p.east*axis.east+p.north*axis.north}}),extent=Math.max(20,Math.ceil(Math.max(...positions.map(p=>Math.abs(p.value)))/20)*20);plot('distanceChart',positions,'Posición sobre el eje (km)',-extent,extent);
   current={events,axis,reference,positions,fit,peaks}; updateInterpretation();
-  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del primer evento visible. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
+  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del sismo principal (o del primer evento visible, si es anterior). Marca vertical: principal del 9 oct., 12:56 Panamá. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
  function interpret(){
   if(!current)return '<p>No hay eventos con los filtros actuales.</p>';
