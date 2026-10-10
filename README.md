@@ -2,6 +2,7 @@
 Mapa interactivo del catálogo USGS para Panamá y alrededores. Aplicación estática compatible con GitHub Pages, sin claves ni dependencias de compilación.
 
 ## Funciones
+- Consulta USGS al abrir y cada 5 minutos mientras la pestaña esté visible, conservando filtros y posición del mapa.
 - Mapa Leaflet con colores por profundidad y tamaño por magnitud.
 - Filtros de fecha, magnitud, profundidad y localidad.
 - Consultas directas al servicio público USGS; carga de CSV/GeoJSON y exportación de los eventos filtrados.
