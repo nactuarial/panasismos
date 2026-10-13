@@ -17,6 +17,23 @@ window.PanaCharts=(()=>{
   for(let i=0;i<65;i++){if(fl.cost<=fr.cost){hi=r;r=l;fr=fl;l=hi-ratio*(hi-lo);fl=at(l)}else{lo=l;l=r;fl=fr;r=lo+ratio*(hi-lo);fr=at(r)}}
   const fit=at((lo+hi)/2);return[{time:first,value:fit.a},{time:first+span,value:fit.a+fit.b}];
  }
+ function maximumPeaks(events,threshold=1){
+  // Confirm chronologically after a drop of threshold M; allow later higher peaks.
+  if(!events.length)return{confirmed:[],provisional:null};
+  const confirmed=[];let candidate=events[0],trough=null,seekingPeak=true;
+  for(const event of events.slice(1)){
+   if(seekingPeak){
+    if(event.mag>candidate.mag)candidate=event;
+    else if(candidate.mag-event.mag>=threshold-1e-9){
+     confirmed.push(candidate);trough=event;seekingPeak=false;
+    }
+   }else{
+    if(event.mag<trough.mag)trough=event;
+    else if(event.mag-trough.mag>=threshold-1e-9){candidate=event;seekingPeak=true;}
+   }
+  }
+  return{confirmed,provisional:seekingPeak?candidate:null};
+ }
  function distance(e,ref){const rad=Math.PI/180,lat1=ref.lat*rad,lat2=e.lat*rad,dlat=lat2-lat1,dlon=(e.lon-ref.lon)*rad;return 12742.0176*Math.asin(Math.sqrt(Math.min(1,Math.sin(dlat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlon/2)**2)))}
 
  function offset(e,ref){
@@ -54,22 +71,19 @@ window.PanaCharts=(()=>{
    values.forEach(({e,value})=>{const tooltip='M '+e.mag.toFixed(1)+' · '+fmt.format(e.time)+' · '+e.place+(id==='distanceChart'?' · '+(value>0?'+':'')+value.toFixed(1)+' km sobre el eje':'');parts.push('<circle cx="'+x(e.time)+'" cy="'+y(value)+'" r="'+(id==='distanceChart'?Math.max(3,3+(e.mag-4)*1.5):3.5)+'" fill="'+blue+'" fill-opacity=".8" stroke="white" stroke-width=".6"><title>'+escape(tooltip)+'</title></circle>')});
    if(extra)parts.push(extra(y));parts.push('</svg>');document.getElementById(id).innerHTML=parts.join('');
   }
-  const candidates=[];let max=-Infinity;for(let i=events.length-1;i>=0;i--)if(events[i].mag>max){candidates.push(i);max=events[i].mag}candidates.reverse();
-  const prominence=i=>{let left=events[i].mag,right=events[i].mag;for(let j=i-1;j>=0;j--){if(events[j].mag>events[i].mag)break;left=Math.min(left,events[j].mag)}for(let j=i+1;j<events.length;j++){if(events[j].mag>events[i].mag)break;right=Math.min(right,events[j].mag)}return events[i].mag-Math.max(left,right)};
-  const peaks=candidates.filter((i,k)=>k===0||(i>0&&i<events.length-1&&events[i].mag>=events[i-1].mag&&events[i].mag>=events[i+1].mag&&prominence(i)>=1)).map(i=>events[i]);
-  const selected=events.find(e=>e.id==='us6000u1e5');if(selected&&!peaks.some(e=>e.id===selected.id)){peaks.push(selected);peaks.sort((a,b)=>a.time-b.time)}
+  const peakState=maximumPeaks(events),confirmed=peakState.confirmed,provisional=peakState.provisional;
+  const peaks=provisional?[...confirmed,provisional]:confirmed;
   const fit=medianFit(events),mags=events.map(e=>e.mag),low=Math.floor(Math.min(...mags)*2)/2-.2,high=Math.ceil(Math.max(...mags)*2)/2+.3;
   const line=(pts,y,color,dashed=false)=>'<polyline points="'+pts.map(p=>x(p.time)+','+y(p.value)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="2.4"'+(dashed?' stroke-dasharray="6 5"':'')+'/>';
-  let extension=[];
-  if(peaks.length>=2){const a=peaks.at(-2),b=peaks.at(-1);if(b.time>a.time&&last>b.time){let stop=last,value=b.mag+(b.mag-a.mag)*(last-b.time)/(b.time-a.time);if(value<low){stop=b.time+(low-b.mag)*(b.time-a.time)/(b.mag-a.mag);value=low}extension=[{time:b.time,value:b.mag},{time:stop,value}]}}
-  plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(peaks.map(e=>({time:e.time,value:e.mag})),y,gold)+(extension.length?line(extension,y,gold,true):'')+(fit?line(fit,y,ink):''));
+  const openPoints=provisional?[...(confirmed.length?[{time:confirmed.at(-1).time,value:confirmed.at(-1).mag}]:[]),{time:provisional.time,value:provisional.mag},...(last>provisional.time?[{time:last,value:provisional.mag}]:[])]:[];
+  plot('magnitudeChart',events.map(e=>({e,value:e.mag})),'Magnitud (M)',low,high,y=>line(confirmed.map(e=>({time:e.time,value:e.mag})),y,gold)+(openPoints.length?line(openPoints,y,gold,true):'')+(provisional?'<circle cx="'+x(provisional.time)+'" cy="'+y(provisional.mag)+'" r="5" fill="white" stroke="'+gold+'" stroke-width="2"><title>Pico provisional · M '+provisional.mag.toFixed(1)+'</title></circle>':'')+(fit?line(fit,y,ink):''));
   const positions=events.map(e=>{const p=offset(e,reference);return{e,value:p.east*axis.east+p.north*axis.north}}),extent=Math.max(20,Math.ceil(Math.max(...positions.map(p=>Math.abs(p.value)))/20)*20);plot('distanceChart',positions,'Posición sobre el eje (km)',-extent,extent);
-  current={events,axis,reference,positions,fit,peaks}; updateInterpretation();
-  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del sismo principal (o del primer evento visible, si es anterior). Marca vertical: principal del 9 oct., 12:56 Panamá. MaxTrend une picos dominantes con prominencia ≥ 1 M y el evento M 4,8 del 10 oct., 05:35, seleccionado como referencia cuando está visible; trazo continuo hasta el último pico confirmado y prolongación punteada de su último tramo hasta el final visible (o el límite del eje). La prolongación es visual, no un pronóstico. Selección retrospectiva, descendente por construcción. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
+  current={events,axis,reference,positions,fit,peaks,confirmed,provisional}; updateInterpretation();
+  note.textContent=events.length+' eventos filtrados · Horas de Panamá (UTC−5). Eje temporal desde una hora antes del sismo principal (o del primer evento visible, si es anterior). Marca vertical: principal del 9 oct., 12:56 Panamá. MaxTrend selecciona picos en orden cronológico: un descenso posterior de ≥ 1 M confirma un pico y un repunte de ≥ 1 M desde el mínimo posterior abre el siguiente. Conserva los picos confirmados y admite subidas. El pico en formación y su conexión se muestran punteados; la cola horizontal llega únicamente al último evento visible. No extrapola ni pronostica; los filtros y revisiones del catálogo pueden cambiar los picos. MedianTrend ajusta la mediana de todo el período (cuantil 0,5), sin extrapolar.';
  }
  function interpret(){
   if(!current)return '<p>No hay eventos con los filtros actuales.</p>';
-  const {events,axis,reference,positions,fit,peaks}=current;
+  const {events,axis,reference,positions,fit,peaks,confirmed,provisional}=current;
   const fmtN=n=>n.toLocaleString('es-PA',{maximumFractionDigits:1});
   const out=[];
   out.push('<p><strong>Lectura de '+events.length+' eventos visibles</strong> · '+escape(fmt.format(events[0].time))+' a '+escape(fmt.format(events.at(-1).time))+'.</p>');
@@ -77,8 +91,9 @@ window.PanaCharts=(()=>{
   const trendDirection=delta=>delta<-.05?'descendente':delta>.05?'ascendente':'prácticamente estable';
   if(peaks.length>=2&&fit){
    const maxDirection=trendDirection(peaks.at(-1).mag-peaks[0].mag),medianDirection=trendDirection(fit[1].value-fit[0].value);
-   const bothDown=maxDirection==='descendente'&&medianDirection==='descendente';
-   out.push('<p><strong>Tendencia de magnitud.</strong> '+(bothDown?'MaxTrend y MedianTrend descienden en el período mostrado: tanto los picos seleccionados como la magnitud central ajustada presentan una tendencia a la baja.':'MaxTrend es '+maxDirection+' y MedianTrend es '+medianDirection+' en el período mostrado.')+' MaxTrend pasa de M '+fmtN(peaks[0].mag)+' a M '+fmtN(peaks.at(-1).mag)+'; MedianTrend, de M '+fmtN(fit[0].value)+' a M '+fmtN(fit[1].value)+'. La lectura de MaxTrend utiliza su tramo continuo; la extensión punteada no se considera un dato observado.</p>');
+   const rises=peaks.slice(1).map((p,i)=>({previous:peaks[i],peak:p})).filter(p=>p.peak.mag>p.previous.mag+.05);
+   const latestRise=rises.at(-1),interrupted=latestRise&&peaks.slice(1,peaks.indexOf(latestRise.peak)).some((p,i)=>p.mag<peaks[i].mag-.05),bothDown=!latestRise&&maxDirection==='descendente'&&medianDirection==='descendente';
+   out.push('<p><strong>Tendencia de magnitud.</strong> '+(bothDown?'MaxTrend y MedianTrend descienden en el período mostrado: tanto los picos seleccionados como la magnitud central ajustada presentan una tendencia a la baja.':'Entre los extremos del período, MaxTrend es '+maxDirection+' y MedianTrend es '+medianDirection+'.')+(latestRise?' El pico de M '+fmtN(latestRise.peak.mag)+' del '+escape(fmt.format(latestRise.peak.time))+' supera el máximo seleccionado anterior de M '+fmtN(latestRise.previous.mag)+(interrupted?' e interrumpe el descenso observado':' y muestra un repunte')+(provisional&&latestRise.peak===provisional?' (pico provisional).':'.')+' La evolución posterior permanece abierta.':'')+' MaxTrend pasa de M '+fmtN(peaks[0].mag)+' a M '+fmtN(peaks.at(-1).mag)+'; MedianTrend, de M '+fmtN(fit[0].value)+' a M '+fmtN(fit[1].value)+'. El tramo continuo une picos confirmados por un descenso posterior de ≥ 1 M; el punteado contiene el pico provisional observado, aún sin confirmar. La cola horizontal no representa nuevas observaciones ni un pronóstico. El cambio entre extremos resume todo el período y puede ocultar repuntes intermedios.</p>');
   }else out.push('<p><strong>Tendencia de magnitud.</strong> Faltan puntos para comparar ambas líneas de tendencia con estos filtros.</p>');
   const sequence=events.filter(e=>e.time>reference.time&&distance(e,reference)<=150);
   if(sequence.length<10||sequence.at(-1).time===sequence[0].time){out.push('<p>Se necesitan al menos 10 eventos posteriores al principal, dentro de 150 km, para comparar magnitud, frecuencia y alcance. Con estos filtros hay '+sequence.length+'.</p>');}
