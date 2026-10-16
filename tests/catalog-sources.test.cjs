@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const {hasShakeMap,matchLocal,periodBounds}=require('../catalog-sources.js');
+assert(hasShakeMap({types:',origin,shakemap,'}));assert(!hasShakeMap({types:',origin,shakemap-scenario,'}));
+const event={id:'igc',time:100000,lat:7.5,lon:-80.7,mag:4.5};
+const usgs={...event,id:'us1',time:110000,url:'https://earthquake.usgs.gov/earthquakes/eventpage/us1'};
+assert.equal(matchLocal([event],[usgs])[0].usgsId,'us1');
+assert.equal(matchLocal([event],[{...usgs,time:200000}])[0].hasShakeMap,false);
+assert.equal(matchLocal([event],[{...usgs,lat:9}])[0].hasShakeMap,false);
+assert.equal(matchLocal([event],[{...usgs,mag:6}])[0].hasShakeMap,false);
+assert.equal(matchLocal([event],[usgs,{...usgs,id:'us2'}])[0].hasShakeMap,false);
+assert(matchLocal([event,{...event,id:'igc2'}],[usgs]).every(e=>!e.hasShakeMap));
+assert.equal(periodBounds('today',Date.parse('2026-10-16T03:00:00Z')).start,Date.parse('2026-10-15T05:00:00Z'));
+assert.equal(periodBounds('today',Date.parse('2026-10-16T05:01:00Z')).start,Date.parse('2026-10-16T05:00:00Z'));
+assert.equal(periodBounds('history').start,Date.parse('2000-01-01T00:00:00Z'));
+console.log('Catálogo: asociaciones únicas, ambigüedad, límites y día de Panamá OK');
