@@ -1,5 +1,10 @@
 name: Actualizar catálogo IGC-UP
 on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/update_igc.py
+      - .github/workflows/update-igc.yml
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
